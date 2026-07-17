@@ -1,3 +1,6 @@
 [build]
   command = "npm run build"
-  publish = ".netlify/dist"
+  publish = "dist/client"
+
+[build.environment]
+  NITRO_PRESET = "netlify"
