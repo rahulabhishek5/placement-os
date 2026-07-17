@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import {
-  LayoutDashboard, Building2, Code2, BookOpen, CheckSquare, User, Settings,
+  LayoutDashboard, Building2, Code2, BookOpen, CheckSquare, Settings,
   LogOut, Search, PanelLeftClose, PanelLeft, Menu, X,
 } from "lucide-react";
 import { auth } from "@/lib/store";
@@ -13,7 +13,6 @@ const NAV = [
   { to: "/leetcode", label: "LeetCode", icon: Code2 },
   { to: "/subjects", label: "Subjects", icon: BookOpen },
   { to: "/tasks", label: "Daily Tasks", icon: CheckSquare },
-  { to: "/profile", label: "Profile", icon: User },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 

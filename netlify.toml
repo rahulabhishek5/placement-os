@@ -2,5 +2,8 @@
   command = "npm run build"
   publish = "dist/client"
 
-[build.environment]
-  NITRO_PRESET = "netlify"
+# SPA fallback — all routes serve index.html so TanStack Router handles them client-side
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
