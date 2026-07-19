@@ -36,6 +36,7 @@ export type Profile = {
   college?: string;
   targetRole?: string;
   avatarSeed: string;
+  lcUsername: string; // stored in profiles.avatar_seed in Supabase
 };
 
 export type Store = {
@@ -105,6 +106,7 @@ const defaultStore: Store = {
     college: "",
     targetRole: "Software Engineer",
     avatarSeed: "dev",
+    lcUsername: "",
   },
   tasks: [],
   applications: [],
@@ -165,6 +167,7 @@ export function useStore() {
                 college: profileRes.data.college || "",
                 targetRole: profileRes.data.target_role || "Software Engineer",
                 avatarSeed: profileRes.data.avatar_seed || "dev",
+                lcUsername: profileRes.data.avatar_seed || "", // avatar_seed stores the LC username
               };
               next.streak = profileRes.data.streak || 0;
             }

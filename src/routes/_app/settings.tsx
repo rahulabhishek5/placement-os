@@ -47,7 +47,7 @@ function ProfileSection() {
   const [name, setName] = useState(store.profile.name ?? "");
   const [college, setCollege] = useState(store.profile.college ?? "");
   const [targetRole, setTargetRole] = useState(store.profile.targetRole ?? "Software Engineer");
-  const [lcUsername, setLcUsername] = useState(store.profile.email ?? ""); // repurposed field for LC username
+  const [lcUsername, setLcUsername] = useState(store.profile.lcUsername ?? "");
   const [saving, setSaving] = useState(false);
   const [lcLoading, setLcLoading] = useState(false);
   const [banner, setBanner] = useState<{ type: "success" | "error"; msg: string } | null>(null);
@@ -91,7 +91,7 @@ function ProfileSection() {
     try {
       update((s) => ({
         ...s,
-        profile: { ...s.profile, email: lcUsername }, // stored in profile.email slot, repurposed
+        profile: { ...s.profile, lcUsername },
       }));
 
       const { data: { user: sbUser } } = await supabase.auth.getUser();
@@ -118,7 +118,7 @@ function ProfileSection() {
     try {
       update((s) => ({
         ...s,
-        profile: { ...s.profile, email: "" },
+        profile: { ...s.profile, lcUsername: "" },
       }));
       setLcUsername("");
 
@@ -152,7 +152,7 @@ function ProfileSection() {
           <Field label="Email (read-only)">
             <input
               disabled
-              value={user?.email ?? store.profile.email}
+              value={user?.email ?? ""}
               className={cn(inputCls, "opacity-50 cursor-not-allowed")}
             />
           </Field>

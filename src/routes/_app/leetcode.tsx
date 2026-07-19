@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { lc, type LcEntry } from "@/lib/store";
+import { useStore } from "@/lib/placement-store";
 import { PageHeader, Panel, StatCard } from "@/components/ui-bits";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ExternalLink } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const Route = createFileRoute("/_app/leetcode")({
@@ -12,8 +13,11 @@ export const Route = createFileRoute("/_app/leetcode")({
 
 function LcPage() {
   const all = lc.useAll();
+  const { store, hydrated } = useStore();
   const [title, setTitle] = useState("");
   const [diff, setDiff] = useState<LcEntry["difficulty"]>("easy");
+
+  const lcUsername = hydrated ? (store.profile.lcUsername ?? "") : "";
 
   const stats = useMemo(() => {
     const b = { easy: 0, medium: 0, hard: 0 };
@@ -44,6 +48,38 @@ function LcPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="LeetCode Tracker" subtitle="Log every solve. Watch momentum compound." />
+
+      {/* LeetCode username status banner */}
+      {hydrated && (
+        lcUsername ? (
+          <div className="flex items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
+            <span className="mono text-[10px] uppercase tracking-widest text-muted-foreground">Connected as</span>
+            <a
+              href={`https://leetcode.com/${lcUsername}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-brand/10 px-3 py-1 text-sm font-semibold text-brand hover:bg-brand/20 transition"
+            >
+              {lcUsername}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+            <span className="mono text-[10px] text-muted-foreground ml-auto">
+              Solves below are logged manually.{" "}
+              <Link to="/settings" className="text-brand hover:underline">Update in Settings →</Link>
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between rounded-lg border border-dashed border-hairline bg-surface/50 px-4 py-3">
+            <span className="text-sm text-muted-foreground">No LeetCode username linked yet.</span>
+            <Link
+              to="/settings"
+              className="mono text-xs font-semibold text-brand hover:underline"
+            >
+              Link username in Settings →
+            </Link>
+          </div>
+        )
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Total Solved" value={all.length} accent />
