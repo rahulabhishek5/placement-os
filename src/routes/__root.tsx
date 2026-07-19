@@ -7,9 +7,11 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { getAuthState } from "@/lib/auth";
+import { ensureSupabaseSessionCookieSync } from "@/lib/supabase";
 
 function NotFoundComponent() {
   return (
@@ -69,6 +71,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  beforeLoad: async () => {
+    const auth = await getAuthState();
+
+    return { auth };
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -110,6 +117,10 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    ensureSupabaseSessionCookieSync();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

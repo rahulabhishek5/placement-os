@@ -1,8 +1,24 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, syncSupabaseSessionCookies } from "@/lib/supabase";
+
+function sanitizeRedirect(target: unknown) {
+  if (typeof target !== "string" || !target.startsWith("/") || target.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  return target;
+}
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search) => ({
+    redirect: sanitizeRedirect(search.redirect),
+  }),
+  beforeLoad: ({ context, search }) => {
+    if (context.auth.isAuthenticated) {
+      throw redirect({ to: search.redirect });
+    }
+  },
   head: () => ({ meta: [{ title: "Sign in — PlacementOS" }] }),
   component: Login,
 });
@@ -11,6 +27,8 @@ type Mode = "signin" | "signup";
 
 function Login() {
   const navigate = useNavigate();
+  const router = useRouter();
+  const search = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<Mode>("signin");
@@ -28,9 +46,11 @@ function Login() {
 
     try {
       if (mode === "signin") {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
-        navigate({ to: "/dashboard" });
+        syncSupabaseSessionCookies(data.session ?? null);
+        await router.invalidate();
+        navigate({ to: search.redirect });
       } else {
         // signUp automatically triggers the handle_new_user() DB trigger
         // which inserts a row into public.profiles — no manual insert needed.
@@ -55,7 +75,7 @@ function Login() {
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(search.redirect)}`,
         },
       });
       if (err) throw err;

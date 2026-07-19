@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppTasksRouteImport } from './routes/_app/tasks'
 import { Route as AppSubjectsRouteImport } from './routes/_app/subjects'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
@@ -32,6 +33,11 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppTasksRoute = AppTasksRouteImport.update({
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/subjects': typeof AppSubjectsRoute
   '/tasks': typeof AppTasksRoute
+  '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/subjects': typeof AppSubjectsRoute
   '/tasks': typeof AppTasksRoute
+  '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/subjects': typeof AppSubjectsRoute
   '/_app/tasks': typeof AppTasksRoute
+  '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subjects'
     | '/tasks'
+    | '/auth/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subjects'
     | '/tasks'
+    | '/auth/callback'
   id:
     | '__root__'
     | '/'
@@ -140,12 +151,14 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/subjects'
     | '/_app/tasks'
+    | '/auth/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -169,6 +182,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/tasks': {
@@ -249,6 +269,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

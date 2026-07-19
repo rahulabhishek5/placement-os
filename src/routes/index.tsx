@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { ArrowRight, Check, Terminal, LineChart, Layers } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -17,6 +17,7 @@ function Landing() {
           <span className="mono text-sm font-bold tracking-tight">PlacementOS</span>
         </div>
         <Link
+        search={{redirect : '/'}}
           to="/login"
           className="mono rounded-md border border-border bg-[oklch(0.21_0_0)] px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary hover:text-primary"
         >

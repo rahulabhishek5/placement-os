@@ -1,11 +1,12 @@
-import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Building2, Code2, BookOpen, CheckSquare, Settings,
   LogOut, Search, PanelLeftClose, PanelLeft, Menu, X,
 } from "lucide-react";
-import { auth } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import type { AppAuthUser } from "@/lib/auth";
+import { supabase, syncSupabaseSessionCookies } from "@/lib/supabase";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -16,19 +17,30 @@ const NAV = [
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  user,
+}: {
+  children: ReactNode;
+  user: AppAuthUser | null;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const user = auth.useUser();
+  const router = useRouter();
 
   const active = NAV.find((n) => pathname.startsWith(n.to));
   const title = active?.label ?? "PlacementOS";
 
-  const handleLogout = () => {
-    auth.signOut();
-    navigate({ to: "/" });
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      syncSupabaseSessionCookies(null);
+    }
+    await router.invalidate();
+    navigate({ to: "/login" });
   };
 
   return (
@@ -42,7 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="text-brand">✓</span> PlacementOS
         </span>
         <div className="h-8 w-8 rounded-full bg-surface hairline grid place-items-center text-xs mono">
-          {user?.name?.[0] ?? "U"}
+          {user?.name?.[0]?.toUpperCase() ?? "U"}
         </div>
       </div>
 
@@ -87,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-3">
               <div className="mono text-xs text-muted-foreground">{user?.email ?? "guest@placementos.dev"}</div>
               <div className="h-9 w-9 rounded-full bg-surface hairline grid place-items-center mono text-sm">
-                {user?.name?.[0] ?? "U"}
+                {user?.name?.[0]?.toUpperCase() ?? "U"}
               </div>
             </div>
           </div>
@@ -109,7 +121,7 @@ function SidebarInner({
   collapsed: boolean;
   pathname: string;
   onToggle?: () => void;
-  user: ReturnType<typeof auth.useUser>;
+  user: AppAuthUser | null;
   onLogout: () => void;
   onNavigate?: () => void;
 }) {

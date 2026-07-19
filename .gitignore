@@ -36,3 +36,6 @@ Import_files/
 # Environment Variables
 .env
 .env.*
+
+# Local Netlify folder
+.netlify
