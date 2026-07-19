@@ -3,7 +3,7 @@ import { useStore } from "@/lib/placement-store";
 import { supabase } from "@/lib/supabase";
 import { auth } from "@/lib/store";
 import { useState } from "react";
-import { AlertTriangle, Download, Save, Trash2, User, Settings2 } from "lucide-react";
+import { AlertTriangle, Download, Save, Trash2, User, Settings2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/settings")({
@@ -50,7 +50,12 @@ function ProfileSection() {
   const [lcUsername, setLcUsername] = useState(store.profile.lcUsername ?? "");
   const [saving, setSaving] = useState(false);
   const [lcLoading, setLcLoading] = useState(false);
+  const [lcStatus, setLcStatus] = useState<"idle" | "valid" | "invalid">("idle");
+  const [lcPreview, setLcPreview] = useState<{ solved: number; easy: number; medium: number; hard: number } | null>(null);
   const [banner, setBanner] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
+  // Sync local input if store changes externally (e.g. after Supabase hydration)
+  const storeUsername = store.profile.lcUsername ?? "";
 
   if (!hydrated) return null;
 
@@ -85,26 +90,50 @@ function ProfileSection() {
     }
   };
 
-  // Save LeetCode username
+  // Validate via alfa-leetcode-api then save if valid
   const saveLcUsername = async () => {
+    const trimmed = lcUsername.trim();
+    if (!trimmed) return;
     setLcLoading(true);
+    setLcPreview(null);
     try {
+      const { fetchLcStats } = await import("@/lib/placement-store");
+      const result = await fetchLcStats(trimmed);
+
+      if (!result.ok) {
+        setLcStatus("invalid");
+        showBanner("error", result.error);
+        return;
+      }
+
+      // Valid — persist
       update((s) => ({
         ...s,
-        profile: { ...s.profile, lcUsername },
+        profile: { ...s.profile, lcUsername: trimmed },
+        lcApiStats: result.stats,
       }));
 
       const { data: { user: sbUser } } = await supabase.auth.getUser();
       if (sbUser) {
-        const { error } = await supabase
+        await supabase
           .from("profiles")
-          .update({ avatar_seed: lcUsername }) // using avatar_seed column to store LC username
+          .update({ avatar_seed: trimmed })
           .eq("id", sbUser.id);
-        if (error) throw error;
       }
 
-      showBanner("success", `LeetCode username "${lcUsername}" saved.`);
+      if (result.stats) {
+        setLcPreview({
+          solved: result.stats.solvedProblem,
+          easy: result.stats.easySolved,
+          medium: result.stats.mediumSolved,
+          hard: result.stats.hardSolved,
+        });
+      }
+
+      setLcStatus("valid");
+      showBanner("success", `✓ "${trimmed}" verified — ${result.stats?.solvedProblem ?? 0} problems solved.`);
     } catch (err: any) {
+      setLcStatus("invalid");
       showBanner("error", err?.message ?? "Failed to save LeetCode username.");
     } finally {
       setLcLoading(false);
@@ -119,8 +148,11 @@ function ProfileSection() {
       update((s) => ({
         ...s,
         profile: { ...s.profile, lcUsername: "" },
+        lcApiStats: null,
       }));
       setLcUsername("");
+      setLcPreview(null);
+      setLcStatus("idle");
 
       const { data: { user: sbUser } } = await supabase.auth.getUser();
       if (sbUser) {
@@ -177,7 +209,7 @@ function ProfileSection() {
           <button
             onClick={saveProfile}
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            className="cursor-pointer inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Save className="h-3.5 w-3.5" />
             {saving ? "Saving…" : "Save profile"}
@@ -189,28 +221,62 @@ function ProfileSection() {
       <section className="rounded-xl border border-border bg-card p-6">
         <h3 className="text-base font-semibold">LeetCode Username</h3>
         <p className="mono mt-1 text-[11px] text-muted-foreground">
-          Used to sync your LeetCode stats and track revision.
+          Enter your LeetCode username to auto-fetch stats. Username is verified before saving.
         </p>
-        <div className="mt-4">
-          <Field label="LeetCode Username">
-            <input
-              value={lcUsername}
-              onChange={(e) => setLcUsername(e.target.value)}
-              className={inputCls}
-              placeholder="e.g. john_doe_99"
-            />
-          </Field>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
+
+        {/* Current linked username badge */}
+        {storeUsername && lcStatus !== "valid" && (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            <CheckCircle2 className="h-3 w-3" />
+            Linked: {storeUsername}
+          </div>
+        )}
+
+        <div className="mt-4 flex gap-2">
+          <input
+            value={lcUsername}
+            onChange={(e) => { setLcUsername(e.target.value); setLcStatus("idle"); setLcPreview(null); }}
+            onKeyDown={(e) => { if (e.key === "Enter") saveLcUsername(); }}
+            className={cn(inputCls, "flex-1", lcStatus === "invalid" && "border-destructive focus:ring-destructive")}
+            placeholder="e.g. john_doe_99"
+          />
           <button
             onClick={saveLcUsername}
             disabled={lcLoading || !lcUsername.trim()}
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            className="cursor-pointer inline-flex shrink-0 items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <Save className="h-3.5 w-3.5" />
-            {lcLoading ? "Saving…" : "Update username"}
+            {lcLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {lcLoading ? "Verifying…" : "Verify & Save"}
           </button>
-          {lcUsername && (
+        </div>
+
+        {/* Validation status */}
+        {lcStatus !== "idle" && (
+          <div className={cn("mt-3 flex items-center gap-2 text-xs font-medium", lcStatus === "valid" ? "text-emerald-500" : "text-destructive")}>
+            {lcStatus === "valid" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+            {lcStatus === "valid" ? "Username verified and synced to LeetCode page." : "Username does not exist on LeetCode."}
+          </div>
+        )}
+
+        {/* Stats preview */}
+        {lcPreview && (
+          <div className="mt-4 grid grid-cols-4 gap-3">
+            {([
+              { label: "Total", val: lcPreview.solved, cls: "text-foreground" },
+              { label: "Easy", val: lcPreview.easy, cls: "text-emerald-400" },
+              { label: "Medium", val: lcPreview.medium, cls: "text-primary" },
+              { label: "Hard", val: lcPreview.hard, cls: "text-destructive" },
+            ] as const).map(({ label, val, cls }) => (
+              <div key={label} className="rounded-lg border border-border bg-background p-3 text-center">
+                <div className={`text-xl font-bold tabular-nums ${cls}`}>{val}</div>
+                <div className="mono mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {store.profile.lcUsername && (
+          <div className="mt-4">
             <button
               onClick={clearLcUsername}
               disabled={lcLoading}
@@ -219,8 +285,8 @@ function ProfileSection() {
               <Trash2 className="h-3.5 w-3.5" />
               Unlink
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </section>
     </div>
   );

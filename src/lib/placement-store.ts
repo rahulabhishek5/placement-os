@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "./supabase";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type Task = {
   id: string;
@@ -30,6 +32,13 @@ export type LeetProblem = {
 export type SubjectTopic = { id: string; title: string; done: boolean };
 export type Subject = { id: string; name: string; topics: SubjectTopic[] };
 
+export type LcApiStats = {
+  solvedProblem: number;
+  easySolved: number;
+  mediumSolved: number;
+  hardSolved: number;
+} | null;
+
 export type Profile = {
   email: string;
   name: string;
@@ -47,9 +56,13 @@ export type Store = {
   subjects: Subject[];
   streak: number;
   lastActive: string;
+  lcApiStats: LcApiStats; // fetched live from alfa-leetcode-api, not persisted
 };
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const KEY = "placementos::v1";
+const LC_API = "https://alfa-leetcode-api.onrender.com";
 
 const defaultSubjects: Subject[] = [
   {
@@ -114,7 +127,10 @@ const defaultStore: Store = {
   subjects: defaultSubjects,
   streak: 0,
   lastActive: new Date().toISOString().slice(0, 10),
+  lcApiStats: null,
 };
+
+// ─── Local Storage ────────────────────────────────────────────────────────────
 
 function readLocal(): Store {
   if (typeof window === "undefined") return defaultStore;
@@ -122,7 +138,12 @@ function readLocal(): Store {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return defaultStore;
     const parsed = JSON.parse(raw) as Partial<Store>;
-    return { ...defaultStore, ...parsed, subjects: parsed.subjects?.length ? parsed.subjects : defaultSubjects };
+    return {
+      ...defaultStore,
+      ...parsed,
+      lcApiStats: null, // never persist API stats — always fetch fresh
+      subjects: parsed.subjects?.length ? parsed.subjects : defaultSubjects,
+    };
   } catch {
     return defaultStore;
   }
@@ -130,138 +151,309 @@ function readLocal(): Store {
 
 function writeLocal(s: Store) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(KEY, JSON.stringify(s));
+  // Strip live API stats before persisting
+  const { lcApiStats: _, ...toSave } = s;
+  window.localStorage.setItem(KEY, JSON.stringify(toSave));
   window.dispatchEvent(new CustomEvent("placementos:change"));
 }
 
+// ─── Singleton Store Pattern ──────────────────────────────────────────────────
+// All useStore() calls share one instance. Supabase is queried once, not once per component.
+
+type Listener = (s: Store) => void;
+let singletonStore: Store = defaultStore;
+let singletonHydrated = false;
+const listeners = new Set<Listener>();
+let cachedUserId: string | null = null;
+
+function emit(next: Store) {
+  singletonStore = next;
+  listeners.forEach((l) => l(next));
+}
+
+async function bootstrapOnce() {
+  if (singletonHydrated) return;
+
+  // Optimistic local hydration first — makes UI appear instantly
+  const local = readLocal();
+  singletonStore = local;
+  singletonHydrated = true;
+  emit(local);
+
+  // Then sync from Supabase in background
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    cachedUserId = user.id;
+
+    const [tasksRes, appsRes, profileRes] = await Promise.all([
+      supabase.from("tasks").select("*").eq("user_id", user.id),
+      supabase.from("applications").select("*").eq("user_id", user.id),
+      supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+    ]);
+
+    const next = { ...singletonStore };
+
+    if (profileRes.data) {
+      next.profile = {
+        email: profileRes.data.email ?? "",
+        name: profileRes.data.name ?? "",
+        college: profileRes.data.college ?? "",
+        targetRole: profileRes.data.target_role ?? "Software Engineer",
+        avatarSeed: profileRes.data.avatar_seed ?? "dev",
+        lcUsername: profileRes.data.avatar_seed ?? "", // avatar_seed column stores LC username
+      };
+      next.streak = profileRes.data.streak ?? 0;
+    }
+
+    if (tasksRes.data) {
+      next.tasks = tasksRes.data.map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        priority: t.priority,
+        done: t.done,
+        createdAt: new Date(t.created_at).getTime(),
+      }));
+    }
+
+    if (appsRes.data) {
+      next.applications = appsRes.data.map((a: any) => ({
+        id: a.id,
+        company: a.company,
+        role: a.role,
+        stage: a.stage,
+        notes: a.notes,
+        createdAt: new Date(a.created_at).getTime(),
+      }));
+    }
+
+    writeLocal(next);
+    emit(next);
+
+    // If there's a saved LC username, fetch API stats right away
+    if (next.profile.lcUsername) {
+      fetchLcStats(next.profile.lcUsername).catch(() => {});
+    }
+  } catch (err) {
+    console.error("Supabase load error", err);
+  }
+}
+
+// ─── LeetCode API Fetch ───────────────────────────────────────────────────────
+
+export async function fetchLcStats(
+  username: string
+): Promise<{ ok: true; stats: LcApiStats } | { ok: false; error: string }> {
+  if (!username.trim()) return { ok: false, error: "No username provided." };
+
+  try {
+    const res = await fetch(`${LC_API}/${encodeURIComponent(username.trim())}/solved`, {
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (res.status === 404 || res.status === 400) {
+      return { ok: false, error: "Username does not exist on LeetCode." };
+    }
+
+    if (!res.ok) {
+      return { ok: false, error: `LeetCode API error (${res.status}). Try again later.` };
+    }
+
+    const data = await res.json();
+
+    // alfa-leetcode-api /solved returns: { solvedProblem, easySolved, mediumSolved, hardSolved }
+    if (typeof data?.solvedProblem !== "number") {
+      return { ok: false, error: "Username does not exist on LeetCode." };
+    }
+
+    const stats: LcApiStats = {
+      solvedProblem: data.solvedProblem ?? 0,
+      easySolved: data.easySolved ?? 0,
+      mediumSolved: data.mediumSolved ?? 0,
+      hardSolved: data.hardSolved ?? 0,
+    };
+
+    // Push stats into the singleton store so LeetCode page updates reactively
+    emit({ ...singletonStore, lcApiStats: stats });
+
+    return { ok: true, stats };
+  } catch (err: any) {
+    if (err?.name === "TimeoutError") {
+      return { ok: false, error: "Request timed out. LeetCode API may be slow — try again." };
+    }
+    return { ok: false, error: "Failed to reach LeetCode API. Check your connection." };
+  }
+}
+
+// ─── useStore Hook ────────────────────────────────────────────────────────────
+
 export function useStore() {
-  const [hydrated, setHydrated] = useState(false);
-  const [store, setStore] = useState<Store>(defaultStore);
+  const [store, setStore] = useState<Store>(singletonStore);
+  const [hydrated, setHydrated] = useState(singletonHydrated);
 
   useEffect(() => {
-    let mounted = true;
-    
-    // Optimistic initial load from local storage
-    const local = readLocal();
-    setStore(local);
-    setHydrated(true);
+    // Subscribe to singleton updates
+    const listener: Listener = (s) => {
+      setStore(s);
+      setHydrated(true);
+    };
+    listeners.add(listener);
 
-    async function loadSupabase() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return; // if not logged in, keep local state
-
-        const [tasksRes, appsRes, profileRes] = await Promise.all([
-          supabase.from("tasks").select("*"),
-          supabase.from("applications").select("*"),
-          supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-        ]);
-
-        if (mounted) {
-          setStore((prev) => {
-            const next = { ...prev };
-            if (profileRes.data) {
-              next.profile = {
-                email: profileRes.data.email,
-                name: profileRes.data.name || "",
-                college: profileRes.data.college || "",
-                targetRole: profileRes.data.target_role || "Software Engineer",
-                avatarSeed: profileRes.data.avatar_seed || "dev",
-                lcUsername: profileRes.data.avatar_seed || "", // avatar_seed stores the LC username
-              };
-              next.streak = profileRes.data.streak || 0;
-            }
-            if (tasksRes.data) {
-              next.tasks = tasksRes.data.map((t: any) => ({
-                id: t.id,
-                title: t.title,
-                priority: t.priority,
-                done: t.done,
-                createdAt: new Date(t.created_at).getTime(),
-              }));
-            }
-            if (appsRes.data) {
-              next.applications = appsRes.data.map((a: any) => ({
-                id: a.id,
-                company: a.company,
-                role: a.role,
-                stage: a.stage,
-                notes: a.notes,
-                createdAt: new Date(a.created_at).getTime(),
-              }));
-            }
-            writeLocal(next);
-            return next;
-          });
-        }
-      } catch (err) {
-        console.error("Supabase load error", err);
-      }
+    // Bootstrap (no-op if already done)
+    if (!singletonHydrated) {
+      bootstrapOnce();
+    } else {
+      setStore(singletonStore);
+      setHydrated(true);
     }
-    loadSupabase();
 
-    const on = () => setStore(readLocal());
-    window.addEventListener("placementos:change", on);
-    window.addEventListener("storage", on);
+    // Also sync on storage events from other tabs
+    const onStorage = () => {
+      const fresh = readLocal();
+      emit({ ...fresh, lcApiStats: singletonStore.lcApiStats });
+    };
+    window.addEventListener("storage", onStorage);
+
     return () => {
-      mounted = false;
-      window.removeEventListener("placementos:change", on);
-      window.removeEventListener("storage", on);
+      listeners.delete(listener);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
   const update = useCallback((fn: (s: Store) => Store) => {
-    setStore((prev) => {
-      const next = fn(prev);
-      writeLocal(next);
+    const prev = singletonStore;
+    const next = fn(prev);
+    writeLocal(next);
+    emit(next);
 
-      // Async Sync to Supabase
+    // Async sync to Supabase — fire and forget
+    const userId = cachedUserId;
+    if (!userId) {
       supabase.auth.getUser().then(({ data: { user } }) => {
-        if (!user) return;
-        
-        // Find modified tasks (naive simple sync logic for POC)
-        // Usually, a real app sends precise mutations. Here we upsert everything or handle specific changes in specialized functions.
-        // For tasks:
-        if (next.tasks.length !== prev.tasks.length || next.tasks.some((t, i) => t.done !== prev.tasks[i]?.done)) {
-           // Insert new tasks or update done state
-           const latestTask = next.tasks[0];
-           if (next.tasks.length > prev.tasks.length && latestTask) {
-             supabase.from("tasks").insert({
-               id: latestTask.id, user_id: user.id, title: latestTask.title, priority: latestTask.priority, done: latestTask.done
-             }).then();
-           } else {
-             // For toggle, we can just upsert all for safety in this simple wrapper
-             supabase.from("tasks").upsert(next.tasks.map(t => ({
-               id: t.id, user_id: user.id, title: t.title, priority: t.priority, done: t.done
-             }))).then();
-           }
-        }
-
-        // Applications sync
-        if (next.applications !== prev.applications) {
-           supabase.from("applications").upsert(next.applications.map(a => ({
-               id: a.id, user_id: user.id, company: a.company, role: a.role, stage: a.stage, notes: a.notes
-           }))).then();
-        }
-
-        // Profile / Streak sync
-        if (next.profile !== prev.profile || next.streak !== prev.streak) {
-           supabase.from("profiles").update({
-              name: next.profile.name,
-              college: next.profile.college,
-              target_role: next.profile.targetRole,
-              avatar_seed: next.profile.avatarSeed,
-              streak: next.streak
-           }).eq("id", user.id).then();
-        }
+        if (user) cachedUserId = user.id;
+        syncToSupabase(prev, next, user?.id ?? null);
       });
-
-      return next;
-    });
+    } else {
+      syncToSupabase(prev, next, userId);
+    }
   }, []);
 
   return { store, update, hydrated };
 }
+
+function syncToSupabase(prev: Store, next: Store, userId: string | null) {
+  if (!userId) return;
+
+  // Tasks: insert new, upsert on done-state change, handle deletes
+  if (next.tasks !== prev.tasks) {
+    const addedIds = new Set(next.tasks.map((t) => t.id));
+    const removedTasks = prev.tasks.filter((t) => !addedIds.has(t.id));
+
+    if (removedTasks.length > 0) {
+      supabase
+        .from("tasks")
+        .delete()
+        .in(
+          "id",
+          removedTasks.map((t) => t.id)
+        )
+        .then();
+    }
+
+    const newTasks = next.tasks.filter((t) => !prev.tasks.some((p) => p.id === t.id));
+    if (newTasks.length > 0) {
+      supabase
+        .from("tasks")
+        .insert(
+          newTasks.map((t) => ({
+            id: t.id,
+            user_id: userId,
+            title: t.title,
+            priority: t.priority,
+            done: t.done,
+          }))
+        )
+        .then();
+    }
+
+    const toggled = next.tasks.filter((t) => {
+      const p = prev.tasks.find((pt) => pt.id === t.id);
+      return p && p.done !== t.done;
+    });
+    if (toggled.length > 0) {
+      supabase
+        .from("tasks")
+        .upsert(
+          toggled.map((t) => ({
+            id: t.id,
+            user_id: userId,
+            title: t.title,
+            priority: t.priority,
+            done: t.done,
+          }))
+        )
+        .then();
+    }
+  }
+
+  // Applications: upsert additions, delete removals
+  if (next.applications !== prev.applications) {
+    const prevIds = new Set(prev.applications.map((a) => a.id));
+    const nextIds = new Set(next.applications.map((a) => a.id));
+
+    const removed = prev.applications.filter((a) => !nextIds.has(a.id));
+    if (removed.length > 0) {
+      supabase
+        .from("applications")
+        .delete()
+        .in(
+          "id",
+          removed.map((a) => a.id)
+        )
+        .then();
+    }
+
+    const upserted = next.applications.filter(
+      (a) =>
+        !prevIds.has(a.id) ||
+        prev.applications.find((p) => p.id === a.id)?.stage !== a.stage
+    );
+    if (upserted.length > 0) {
+      supabase
+        .from("applications")
+        .upsert(
+          upserted.map((a) => ({
+            id: a.id,
+            user_id: userId,
+            company: a.company,
+            role: a.role,
+            stage: a.stage,
+            notes: a.notes ?? null,
+          }))
+        )
+        .then();
+    }
+  }
+
+  // Profile / streak
+  if (next.profile !== prev.profile || next.streak !== prev.streak) {
+    supabase
+      .from("profiles")
+      .update({
+        name: next.profile.name,
+        college: next.profile.college ?? null,
+        target_role: next.profile.targetRole ?? null,
+        avatar_seed: next.profile.lcUsername, // ← correct: lcUsername → avatar_seed
+        streak: next.streak,
+      })
+      .eq("id", userId)
+      .then();
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function uid() {
   return crypto.randomUUID();

@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { lc, type LcEntry } from "@/lib/store";
-import { useStore } from "@/lib/placement-store";
+import { useStore, fetchLcStats } from "@/lib/placement-store";
 import { PageHeader, Panel, StatCard } from "@/components/ui-bits";
-import { Plus, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Trash2, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const Route = createFileRoute("/_app/leetcode")({
@@ -16,10 +16,45 @@ function LcPage() {
   const { store, hydrated } = useStore();
   const [title, setTitle] = useState("");
   const [diff, setDiff] = useState<LcEntry["difficulty"]>("easy");
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const lcUsername = hydrated ? (store.profile.lcUsername ?? "") : "";
+  const apiStats = hydrated ? store.lcApiStats : null;
 
-  const stats = useMemo(() => {
+  // Auto-fetch LC stats when username is available and stats not yet loaded
+  useEffect(() => {
+    if (!hydrated || !lcUsername || apiStats) return;
+
+    let cancelled = false;
+    setApiLoading(true);
+    setApiError(null);
+
+    fetchLcStats(lcUsername).then((result) => {
+      if (cancelled) return;
+      if (!result.ok) setApiError(result.error);
+      setApiLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [hydrated, lcUsername]); // Only re-run when username changes
+
+  const refreshStats = async () => {
+    if (!lcUsername) return;
+    setApiLoading(true);
+    setApiError(null);
+    const result = await fetchLcStats(lcUsername);
+    if (!result.ok) setApiError(result.error);
+    setApiLoading(false);
+  };
+
+  // Use API stats for top cards if available, fall back to locally-logged stats
+  const displayStats = apiStats
+    ? { total: apiStats.solvedProblem, easy: apiStats.easySolved, medium: apiStats.mediumSolved, hard: apiStats.hardSolved }
+    : { total: all.length, easy: 0, medium: 0, hard: 0 };
+
+  // Local log stats (breakdown of manually logged problems)
+  const localStats = useMemo(() => {
     const b = { easy: 0, medium: 0, hard: 0 };
     all.forEach((e) => b[e.difficulty]++);
     return b;
@@ -49,10 +84,10 @@ function LcPage() {
     <div className="space-y-6">
       <PageHeader title="LeetCode Tracker" subtitle="Log every solve. Watch momentum compound." />
 
-      {/* LeetCode username status banner */}
+      {/* Username connection banner */}
       {hydrated && (
         lcUsername ? (
-          <div className="flex items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
             <span className="mono text-[10px] uppercase tracking-widest text-muted-foreground">Connected as</span>
             <a
               href={`https://leetcode.com/${lcUsername}`}
@@ -63,38 +98,57 @@ function LcPage() {
               {lcUsername}
               <ExternalLink className="h-3 w-3" />
             </a>
-            <span className="mono text-[10px] text-muted-foreground ml-auto">
-              Solves below are logged manually.{" "}
-              <Link to="/settings" className="text-brand hover:underline">Update in Settings →</Link>
-            </span>
+            {apiLoading && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> Fetching stats…
+              </span>
+            )}
+            {apiError && (
+              <span className="text-xs text-destructive">{apiError}</span>
+            )}
+            <button
+              onClick={refreshStats}
+              disabled={apiLoading}
+              className="cursor-pointer ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition disabled:opacity-50"
+              title="Refresh stats from LeetCode"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${apiLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
           </div>
         ) : (
           <div className="flex items-center justify-between rounded-lg border border-dashed border-hairline bg-surface/50 px-4 py-3">
             <span className="text-sm text-muted-foreground">No LeetCode username linked yet.</span>
-            <Link
-              to="/settings"
-              className="mono text-xs font-semibold text-brand hover:underline"
-            >
+            <Link to="/settings" className="cursor-pointer mono text-xs font-semibold text-brand hover:underline">
               Link username in Settings →
             </Link>
           </div>
         )
       )}
 
+      {/* Stats cards — show API data if available */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Solved" value={all.length} accent />
-        <StatCard label="Easy" value={stats.easy} />
-        <StatCard label="Medium" value={stats.medium} />
-        <StatCard label="Hard" value={stats.hard} />
+        <StatCard label={apiStats ? "Total Solved (LC)" : "Manually Logged"} value={displayStats.total} accent />
+        <StatCard label="Easy" value={apiStats ? displayStats.easy : localStats.easy} />
+        <StatCard label="Medium" value={apiStats ? displayStats.medium : localStats.medium} />
+        <StatCard label="Hard" value={apiStats ? displayStats.hard : localStats.hard} />
       </div>
 
+      {apiStats && (
+        <p className="mono text-[10px] text-muted-foreground -mt-2">
+          ↑ Live stats from LeetCode. Manual log below tracks your session solves.
+        </p>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-6">
-        <Panel title="Difficulty Breakdown" subtitle="Where your effort landed.">
+        <Panel title="Difficulty Breakdown" subtitle={apiStats ? "From your LeetCode profile." : "From your manual solve log."}>
           <div className="space-y-4">
             {(["easy", "medium", "hard"] as const).map((d) => {
-              const c = stats[d];
-              const total = all.length || 1;
-              const pct = Math.round((c / total) * 100);
+              const c = apiStats
+                ? (d === "easy" ? apiStats.easySolved : d === "medium" ? apiStats.mediumSolved : apiStats.hardSolved)
+                : localStats[d];
+              const total = apiStats ? apiStats.solvedProblem : all.length;
+              const pct = total > 0 ? Math.round((c / total) * 100) : 0;
               return (
                 <div key={d}>
                   <div className="flex items-baseline justify-between text-sm mono">
@@ -102,7 +156,7 @@ function LcPage() {
                     <span className="text-muted-foreground text-xs">{c} · {pct}%</span>
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-surface-2 overflow-hidden">
-                    <div className={"h-full " + diffBg(d)} style={{ width: `${pct}%` }} />
+                    <div className={"h-full " + diffBg(d)} style={{ width: `${pct}%`, transition: "width 0.5s ease" }} />
                   </div>
                 </div>
               );
@@ -110,7 +164,7 @@ function LcPage() {
           </div>
         </Panel>
 
-        <Panel title="Weekly Trend" subtitle="Problems solved in the last 7 days.">
+        <Panel title="Weekly Trend" subtitle="Problems logged in the last 7 days.">
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weekData}>
@@ -127,15 +181,15 @@ function LcPage() {
         </Panel>
       </div>
 
-      <Panel title="Log a Solve">
+      <Panel title="Log a Solve" subtitle="Manually track what you solved today.">
         <form onSubmit={add} className="flex flex-col sm:flex-row gap-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Problem title (e.g. Two Sum)"
             className="flex-1 h-10 rounded-md bg-background hairline px-3 text-sm focus:outline-none focus:ring-1 focus:ring-brand" />
           <select value={diff} onChange={(e) => setDiff(e.target.value as LcEntry["difficulty"])}
-            className="h-10 rounded-md bg-background hairline px-3 text-sm">
+            className="cursor-pointer h-10 rounded-md bg-background hairline px-3 text-sm">
             <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
           </select>
-          <button className="h-10 rounded-md bg-brand text-brand-foreground px-4 text-sm font-semibold inline-flex items-center gap-2">
+          <button type="submit" className="cursor-pointer h-10 rounded-md bg-brand text-brand-foreground px-4 text-sm font-semibold inline-flex items-center gap-2">
             <Plus className="h-4 w-4" /> Log
           </button>
         </form>
@@ -147,7 +201,7 @@ function LcPage() {
                 <span className={"mono text-[10px] uppercase px-2 py-0.5 rounded " + diffPill(e.difficulty)}>{e.difficulty}</span>
                 <span className="text-sm flex-1 truncate">{e.title}</span>
                 <span className="mono text-[11px] text-muted-foreground">{e.date}</span>
-                <button onClick={() => lc.remove(e.id)} className="text-muted-foreground hover:text-coral">
+                <button onClick={() => lc.remove(e.id)} className="cursor-pointer text-muted-foreground hover:text-coral">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </li>

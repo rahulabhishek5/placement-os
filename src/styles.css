@@ -114,6 +114,15 @@
     border-color: var(--color-border);
   }
 
+  /* Global: all clickable elements should show pointer cursor */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  a[href],
+  select,
+  label[for] {
+    cursor: pointer;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -123,6 +132,11 @@
 
   h1, h2, h3, h4 {
     letter-spacing: -0.02em;
+  }
+
+  /* Smooth view-transition for near-instant page navigation feel */
+  @view-transition {
+    navigation: auto;
   }
 }
 
