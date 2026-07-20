@@ -86,6 +86,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "The Operating System for Placements." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "google-site-verification", content: "wd9vAA5ygPSiPntcrZIzuBKS6cQzdQ-cKHPa1hwd9oI" },
     ],
     links: [
       {
