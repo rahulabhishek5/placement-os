@@ -11,12 +11,12 @@ function sanitizeRedirect(target: unknown) {
 }
 
 export const Route = createFileRoute("/login")({
-  validateSearch: (search) => ({
-    redirect: sanitizeRedirect(search.redirect),
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+    redirect: search.redirect ? sanitizeRedirect(search.redirect) : undefined,
   }),
   beforeLoad: ({ context, search }) => {
     if (context.auth.isAuthenticated) {
-      throw redirect({ to: search.redirect });
+      throw redirect({ to: sanitizeRedirect(search.redirect) });
     }
   },
   head: () => ({ meta: [{ title: "Sign in — PlacementOS" }] }),
@@ -50,7 +50,8 @@ function Login() {
         if (err) throw err;
         syncSupabaseSessionCookies(data.session ?? null);
         await router.invalidate();
-        navigate({ to: search.redirect });
+        const targetRedirect = sanitizeRedirect(search.redirect);
+        navigate({ to: targetRedirect });
       } else {
         // signUp automatically triggers the handle_new_user() DB trigger
         // which inserts a row into public.profiles — no manual insert needed.
@@ -72,10 +73,11 @@ function Login() {
     setError(null);
     setGoogleLoading(true);
     try {
+      const targetRedirect = sanitizeRedirect(search.redirect);
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(search.redirect)}`,
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(targetRedirect)}`,
         },
       });
       if (err) throw err;
