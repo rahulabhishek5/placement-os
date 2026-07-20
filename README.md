@@ -63,8 +63,6 @@
 
 </div>
 
-> 💡 *Note: You can easily replace the image placeholders above with direct image links or screenshots of the live platform.*
-
 ---
 
 ## 💬 Website Reviews & Feedback
