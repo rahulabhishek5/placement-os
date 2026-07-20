@@ -53,13 +53,28 @@
 
 <div align="center">
 
-| 📊 Dashboard & Analytics | 🏢 Application Kanban |
-| :-: | :-: |
-| *(Add Dashboard Screenshot Here)* | *(Add Kanban Pipeline Screenshot Here)* |
+### 🌐 Landing Page
+![Landing Page](images/Landing_page.png)
 
-| 💻 DSA & LeetCode Tracker | 📚 CS Subjects Syllabus |
-| :-: | :-: |
-| *(Add LeetCode Tracker Screenshot Here)* | *(Add Core Subjects Screenshot Here)* |
+<br />
+
+### 📊 Dashboard Page
+![Dashboard Page](images/Dashboard.png)
+
+<br />
+
+### 🏢 Company Applications
+![Company Applications](images/Companies.png)
+
+<br />
+
+### 💻 LeetCode & DSA Tracker
+![LeetCode & DSA Tracker](images/Leetcode_Tracker.png)
+
+<br />
+
+### 📚 CS Core Syllabus
+![CS Core Syllabus](images/CS_core.png)
 
 </div>
 
