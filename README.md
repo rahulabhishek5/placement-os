@@ -28,7 +28,7 @@
   <tr>
     <td width="50%">
       <h3>🏢 Company Pipeline</h3>
-      <p>Kanban-style tracking for job applications. Effortlessly track applications through stages: <i>Applied → Interview → Offer Accepted</i>.</p>
+      <p>Tracker for job applications. Effortlessly track applications through stages: <i>Applied → Interview → Offer Accepted/Rejected</i>.</p>
     </td>
     <td width="50%">
       <h3>💻 LeetCode Metrics</h3>
@@ -82,7 +82,7 @@
 
 ## 💬 Website Reviews & Feedback
 
-PlacementOS is live and continuously evolving! Your reviews and feedback are essential in helping us improve the website and user experience.
+PlacementOS is live and continuously evolving! Your reviews and feedback are essential in helping me improve the website and user experience.
 
 ### 🌟 How You Can Help Improve PlacementOS:
 - 🧪 **Test the Platform**: Try out the features, track your prep, and test the user flow.
@@ -90,10 +90,8 @@ PlacementOS is live and continuously evolving! Your reviews and feedback are ess
 - 🐛 **Report UI/UX Issues**: Found a bug, broken visual element, or responsiveness issue?
 - 💭 **Share Your Review**: Tell us what you loved and what can be made better!
 
-👉 **[Submit Feedback or Report an Issue](../../issues)**
-
 ---
 
 <div align="center">
-  <i>Built for students & job seekers. Everything you need, nothing you don't.</i>
+  <i>Built for students Preparing for Placements. Everything you need, nothing you don't.</i>
 </div>
