@@ -11,7 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { getAuthState } from "@/lib/auth";
-import { ensureSupabaseSessionCookieSync } from "@/lib/supabase";
+
 
 function NotFoundComponent() {
   return (
@@ -120,7 +120,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
-    ensureSupabaseSessionCookieSync();
+    import("@/lib/supabase-client").then((m) => m.ensureSupabaseSessionCookieSync());
   }, []);
 
   return (

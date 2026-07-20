@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+build/
+.vercel/
 .output
 .vinxi
 .tanstack/**
@@ -33,9 +35,19 @@ Import_files/
 *.sln
 *.sw?
 
+# Python
+__pycache__/
+venv/
+.venv/
+
 # Environment Variables
 .env
 .env.*
 
 # Local Netlify folder
 .netlify
+
+# Local AI & Debug Artifacts
+.agents/
+stats.html
+dependency_graph.md

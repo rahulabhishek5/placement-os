@@ -10,8 +10,7 @@ export const Route = createFileRoute("/_app/tasks")({
 });
 
 function TasksPage() {
-  const { store, update, hydrated } = useStore();
-  const all = store.tasks;
+  const { store: all, update, hydrated } = useStore((s) => s.tasks);
   
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Task["priority"]>("med");

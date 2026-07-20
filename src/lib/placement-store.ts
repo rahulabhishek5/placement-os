@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "./supabase";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -160,19 +160,81 @@ function writeLocal(s: Store) {
 // ─── Singleton Store Pattern ──────────────────────────────────────────────────
 // All useStore() calls share one instance. Supabase is queried once, not once per component.
 
-type Listener = (s: Store) => void;
+type Listener = () => void;
 let singletonStore: Store = defaultStore;
 let singletonHydrated = false;
 const listeners = new Set<Listener>();
 let cachedUserId: string | null = null;
 
+/**
+ * Call this on logout to clear the singleton so the next login gets a fresh bootstrap.
+ * Without this, singletonHydrated=true persists across sessions in the same tab,
+ * and bootstrapOnce() is never re-run, leaving stale data on screen.
+ */
+export function resetStore() {
+  singletonStore = defaultStore;
+  singletonHydrated = false;
+  cachedUserId = null;
+  emit(defaultStore);
+}
+
 function emit(next: Store) {
   singletonStore = next;
-  listeners.forEach((l) => l(next));
+  listeners.forEach((l) => l());
 }
 
 async function bootstrapOnce() {
   if (singletonHydrated) return;
+  
+  // -- Phase 7: Legacy Migration --
+  if (typeof window !== "undefined") {
+    try {
+      const legacyLc = localStorage.getItem("pos:lc");
+      const legacySubj = localStorage.getItem("pos:subjects");
+      let migrated = false;
+      const currentLocal = readLocal();
+
+      if (legacyLc && (!currentLocal.leetcode || currentLocal.leetcode.length === 0)) {
+        const parsedLc = JSON.parse(legacyLc) as any[];
+        currentLocal.leetcode = parsedLc.map(e => ({
+          id: e.id,
+          title: e.title,
+          // Map lowercase to Capitalized to match new schema
+          difficulty: (e.difficulty.charAt(0).toUpperCase() + e.difficulty.slice(1)) as any,
+          solvedAt: new Date(e.date).getTime() || Date.now(),
+        }));
+        migrated = true;
+      }
+
+      if (legacySubj && (!currentLocal.subjects || currentLocal.subjects.length === 0)) {
+        const parsedSubj = JSON.parse(legacySubj) as Record<string, boolean>;
+        // We have to build subjects array based on true values. 
+        // Or we can just store the Record directly if we modify the type.
+        // Wait, placement-store defines subjects as: { id, name, topics: {id, title, done}[] }
+        // Let's just migrate it into the new format based on defaultSubjects.
+        const newSubjects = JSON.parse(JSON.stringify(defaultSubjects));
+        for (const subj of newSubjects) {
+          for (const topic of subj.topics) {
+            if (parsedSubj[`${subj.id}:${topic.title}`]) {
+              topic.done = true;
+            }
+          }
+        }
+        currentLocal.subjects = newSubjects;
+        migrated = true;
+      }
+
+      if (migrated) {
+        // Persist the migrated data into the new placementos::v1 key
+        writeLocal(currentLocal);
+        // Only remove legacy keys after successful migration
+        localStorage.removeItem("pos:lc");
+        localStorage.removeItem("pos:subjects");
+      }
+    } catch (e) {
+      console.error("[Migration] Legacy migration failed:", e);
+    }
+  }
 
   // Optimistic local hydration first — makes UI appear instantly
   const local = readLocal();
@@ -182,17 +244,39 @@ async function bootstrapOnce() {
 
   // Then sync from Supabase in background
   try {
+    const { supabase } = await import("./supabase-client");
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
     cachedUserId = user.id;
 
+    // ── Ensure profile row exists ──────────────────────────────────────────────
+    // The `applications` table has: FOREIGN KEY (user_id) REFERENCES profiles(id)
+    // If the profiles row is missing, every INSERT into applications fails with a
+    // FK violation which PostgREST returns as 409 Conflict.
+    // We upsert the profile here so the FK target is always guaranteed to exist.
+    const profileUpsertRes = await supabase
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          email: user.email ?? "",
+        },
+        { onConflict: "id" } // no-op if profile already exists
+      );
+    if (profileUpsertRes.error) {
+      // Non-fatal: log the error but continue — the profile might already exist
+      // and RLS may simply prevent re-upserting, which is fine.
+      console.warn("[Bootstrap] Profile upsert warning:", profileUpsertRes.error.message, profileUpsertRes.error.code);
+    }
+
     const [tasksRes, appsRes, profileRes] = await Promise.all([
       supabase.from("tasks").select("*").eq("user_id", user.id),
       supabase.from("applications").select("*").eq("user_id", user.id),
       supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     ]);
+
 
     const next = { ...singletonStore };
 
@@ -208,7 +292,9 @@ async function bootstrapOnce() {
       next.streak = profileRes.data.streak ?? 0;
     }
 
-    if (tasksRes.data) {
+    if (tasksRes.error) {
+      console.error("[Bootstrap] Failed to fetch tasks:", tasksRes.error.message, tasksRes.error.code);
+    } else if (tasksRes.data && tasksRes.data.length > 0) {
       next.tasks = tasksRes.data.map((t: any) => ({
         id: t.id,
         title: t.title,
@@ -217,8 +303,16 @@ async function bootstrapOnce() {
         createdAt: new Date(t.created_at).getTime(),
       }));
     }
+    // If cloud returned 0 tasks but local has tasks, keep local data.
+    // This handles the case where sync failed (e.g. 409) and cloud is empty.
 
-    if (appsRes.data) {
+    if (appsRes.error) {
+      // Supabase returned an error (e.g. RLS rejection due to clock skew, expired token).
+      // Do NOT overwrite local data. Do NOT trigger emergency sync.
+      // Keep the local state as-is and log the error for debugging.
+      console.error("[Bootstrap] Failed to fetch applications:", appsRes.error.message, appsRes.error.code);
+    } else if (appsRes.data && appsRes.data.length > 0) {
+      // Cloud has canonical data — use it.
       next.applications = appsRes.data.map((a: any) => ({
         id: a.id,
         company: a.company,
@@ -227,6 +321,18 @@ async function bootstrapOnce() {
         notes: a.notes,
         createdAt: new Date(a.created_at).getTime(),
       }));
+    } else if (appsRes.data && appsRes.data.length === 0 && singletonStore.applications.length > 0) {
+      // Cloud returned empty (no error) but we have local data.
+      // This means local data was never successfully synced to cloud.
+      // Preserve local data AND push it to Supabase now.
+      console.warn("[Bootstrap] Cloud applications empty but local has data — pushing local to cloud.");
+      next.applications = singletonStore.applications; // keep local
+      // Fire-and-forget sync: push all local apps to cloud
+      syncToSupabase(
+        { ...singletonStore, applications: [] }, // prev = empty so all are treated as new
+        { ...next },
+        user.id
+      ).catch((err) => console.error("[Bootstrap] Failed to push local apps to cloud:", err));
     }
 
     writeLocal(next);
@@ -289,27 +395,29 @@ export async function fetchLcStats(
 
 // ─── useStore Hook ────────────────────────────────────────────────────────────
 
-export function useStore() {
-  const [store, setStore] = useState<Store>(singletonStore);
+export function useStore<T = Store>(selector?: (state: Store) => T) {
+  const getSnapshot = useCallback(() => {
+    return selector ? selector(singletonStore) : (singletonStore as unknown as T);
+  }, [selector]);
+
+  const store = useSyncExternalStore(
+    (callback) => {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    },
+    getSnapshot,
+    getSnapshot
+  );
+
   const [hydrated, setHydrated] = useState(singletonHydrated);
 
   useEffect(() => {
-    // Subscribe to singleton updates
-    const listener: Listener = (s) => {
-      setStore(s);
-      setHydrated(true);
-    };
-    listeners.add(listener);
-
-    // Bootstrap (no-op if already done)
     if (!singletonHydrated) {
-      bootstrapOnce();
+      bootstrapOnce().then(() => setHydrated(true));
     } else {
-      setStore(singletonStore);
       setHydrated(true);
     }
 
-    // Also sync on storage events from other tabs
     const onStorage = () => {
       const fresh = readLocal();
       emit({ ...fresh, lcApiStats: singletonStore.lcApiStats });
@@ -317,7 +425,6 @@ export function useStore() {
     window.addEventListener("storage", onStorage);
 
     return () => {
-      listeners.delete(listener);
       window.removeEventListener("storage", onStorage);
     };
   }, []);
@@ -331,9 +438,11 @@ export function useStore() {
     // Async sync to Supabase — fire and forget
     const userId = cachedUserId;
     if (!userId) {
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) cachedUserId = user.id;
-        syncToSupabase(prev, next, user?.id ?? null);
+      import("./supabase-client").then(({ supabase }) => {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) cachedUserId = user.id;
+          syncToSupabase(prev, next, user?.id ?? null);
+        });
       });
     } else {
       syncToSupabase(prev, next, userId);
@@ -343,8 +452,10 @@ export function useStore() {
   return { store, update, hydrated };
 }
 
-function syncToSupabase(prev: Store, next: Store, userId: string | null) {
+async function syncToSupabase(prev: Store, next: Store, userId: string | null) {
   if (!userId) return;
+
+  const { supabase } = await import("./supabase-client");
 
   // Tasks: insert new, upsert on done-state change, handle deletes
   if (next.tasks !== prev.tasks) {
@@ -359,7 +470,7 @@ function syncToSupabase(prev: Store, next: Store, userId: string | null) {
           "id",
           removedTasks.map((t) => t.id)
         )
-        .then();
+        .catch((err) => console.error("[Sync] Failed to delete tasks:", err));
     }
 
     const newTasks = next.tasks.filter((t) => !prev.tasks.some((p) => p.id === t.id));
@@ -375,7 +486,7 @@ function syncToSupabase(prev: Store, next: Store, userId: string | null) {
             done: t.done,
           }))
         )
-        .then();
+        .catch((err) => console.error("[Sync] Failed to insert tasks:", err));
     }
 
     const toggled = next.tasks.filter((t) => {
@@ -394,7 +505,7 @@ function syncToSupabase(prev: Store, next: Store, userId: string | null) {
             done: t.done,
           }))
         )
-        .then();
+        .catch((err) => console.error("[Sync] Failed to upsert tasks:", err));
     }
   }
 
@@ -412,7 +523,7 @@ function syncToSupabase(prev: Store, next: Store, userId: string | null) {
           "id",
           removed.map((a) => a.id)
         )
-        .then();
+        .catch((err) => console.error("[Sync] Failed to delete applications:", err));
     }
 
     const upserted = next.applications.filter(
@@ -421,7 +532,7 @@ function syncToSupabase(prev: Store, next: Store, userId: string | null) {
         prev.applications.find((p) => p.id === a.id)?.stage !== a.stage
     );
     if (upserted.length > 0) {
-      supabase
+      const { error: upsertErr } = await supabase
         .from("applications")
         .upsert(
           upserted.map((a) => ({
@@ -431,9 +542,12 @@ function syncToSupabase(prev: Store, next: Store, userId: string | null) {
             role: a.role,
             stage: a.stage,
             notes: a.notes ?? null,
-          }))
-        )
-        .then();
+          })),
+          { onConflict: "id" } // explicitly target PK to avoid ambiguous 409 conflicts
+        );
+      if (upsertErr) {
+        console.error("[Sync] Failed to upsert applications:", upsertErr.message, upsertErr.details, upsertErr.code);
+      }
     }
   }
 
@@ -449,7 +563,7 @@ function syncToSupabase(prev: Store, next: Store, userId: string | null) {
         streak: next.streak,
       })
       .eq("id", userId)
-      .then();
+      .catch((err) => console.error("[Sync] Failed to update profile:", err));
   }
 }
 

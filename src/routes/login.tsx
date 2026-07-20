@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase, syncSupabaseSessionCookies } from "@/lib/supabase";
+
 
 function sanitizeRedirect(target: unknown) {
   if (typeof target !== "string" || !target.startsWith("/") || target.startsWith("//")) {
@@ -45,6 +45,8 @@ function Login() {
     setLoading(true);
 
     try {
+      const { supabase, syncSupabaseSessionCookies } = await import("@/lib/supabase-client");
+
       if (mode === "signin") {
         const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
@@ -73,6 +75,7 @@ function Login() {
     setError(null);
     setGoogleLoading(true);
     try {
+      const { supabase } = await import("@/lib/supabase-client");
       const targetRedirect = sanitizeRedirect(search.redirect);
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Plus, Trash2, Building2, X } from "lucide-react";
-import { useStore, stageOrder, stageLabels, type Stage, uid } from "@/lib/placement-store";
+import { useStore, stageOrder, stageLabels, type Stage, type Application, uid } from "@/lib/placement-store";
 
 export const Route = createFileRoute("/_app/companies")({
   component: CompaniesPage,
@@ -16,7 +16,7 @@ const stageColor: Record<Stage, string> = {
 };
 
 function CompaniesPage() {
-  const { store, update, hydrated } = useStore();
+  const { store: allApps, update, hydrated } = useStore((s) => s.applications);
   const [open, setOpen] = useState(false);
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
@@ -32,6 +32,14 @@ function CompaniesPage() {
       ],
     }));
     setCompany(""); setRole(""); setStage("applied"); setOpen(false);
+  };
+
+  const columns: Record<Stage, Application[]> = {
+    applied: allApps.filter((a) => a.stage === "applied"),
+    oa: allApps.filter((a) => a.stage === "oa"),
+    interview: allApps.filter((a) => a.stage === "interview"),
+    offer: allApps.filter((a) => a.stage === "offer"),
+    rejected: allApps.filter((a) => a.stage === "rejected"),
   };
 
   const remove = (id: string) =>
@@ -59,7 +67,7 @@ function CompaniesPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         {stageOrder.map((s) => {
-          const items = store.applications.filter((a) => a.stage === s);
+          const items = allApps.filter((a) => a.stage === s);
           return (
             <div key={s} className="flex flex-col rounded-xl border border-border bg-card">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">

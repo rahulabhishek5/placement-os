@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppAuthUser } from "@/lib/auth";
-import { supabase, syncSupabaseSessionCookies } from "@/lib/supabase";
+
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,14 +34,21 @@ export function AppShell({
   const title = active?.label ?? "PlacementOS";
 
   const handleLogout = async () => {
+    const { supabase, syncSupabaseSessionCookies } = await import("@/lib/supabase-client");
+    const { resetStore } = await import("@/lib/placement-store");
     try {
       await supabase.auth.signOut();
     } finally {
       syncSupabaseSessionCookies(null);
+      // Reset the singleton store so the next login gets a fresh bootstrap.
+      // Without this, singletonHydrated stays true in the same tab and
+      // bootstrapOnce() is never re-called after re-login.
+      resetStore();
     }
     await router.invalidate();
     navigate({ to: "/login" });
   };
+
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground">

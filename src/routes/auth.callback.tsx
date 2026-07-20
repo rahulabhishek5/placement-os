@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase, syncSupabaseSessionCookies } from "@/lib/supabase";
+
 
 function sanitizeRedirect(target: unknown) {
   if (typeof target !== "string" || !target.startsWith("/") || target.startsWith("//")) {
@@ -28,6 +28,8 @@ function AuthCallbackPage() {
     let cancelled = false;
 
     async function finalizeLogin() {
+      const { supabase, syncSupabaseSessionCookies } = await import("@/lib/supabase-client");
+
       const {
         data: { session },
         error: sessionError,

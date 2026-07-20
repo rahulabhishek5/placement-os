@@ -1,16 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useEffect } from "react";
-import {
-  tasks,
-  companies,
-  lc,
-  subjects,
-  streak,
-  SUBJECT_TREE,
-  PIPELINE_STAGES,
-  type SubjectKey,
-  type Stage,
-} from "@/lib/store";
+import { useStore, stageLabels, stageOrder, type Stage } from "@/lib/placement-store";
 import {
   Flame,
   Percent,
@@ -25,15 +15,6 @@ export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — PlacementOS" }] }),
   component: DashboardPage,
 });
-
-// ── Stage display metadata ──
-const stageLabel: Record<Stage, string> = {
-  applied: "Applied",
-  oa: "OA",
-  interview: "Interview",
-  offer: "Offer",
-  rejected: "Rejected",
-};
 
 const stageColor: Record<Stage, string> = {
   applied: "text-muted-foreground",
@@ -52,16 +33,25 @@ function greeting() {
 }
 
 function DashboardPage() {
-  const allTasks = tasks.useAll();
-  const allCompanies = companies.useAll();
-  const allLc = lc.useAll();
-  const subjectState = subjects.useAll();
-  const streakVal = streak.useVal();
-
-  // Ping streak on mount (side effect — use useEffect)
+  const { store: allTasks } = useStore((s) => s.tasks);
+  const { store: allCompanies } = useStore((s) => s.applications);
+  const { store: streakVal, update } = useStore((s) => s.streak);
+  const { store: lastActive } = useStore((s) => s.lastActive);
+  const { store: profile } = useStore((s) => s.profile);
+  const { store: allLc } = useStore((s) => s.leetcode);
+  const { store: allSubjects } = useStore((s) => s.subjects);
+  
+  // Ping streak on mount
   useEffect(() => {
-    streak.ping();
-  }, []);
+    const today = new Date().toISOString().slice(0, 10);
+    const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    if (lastActive === today) return;
+    update((s) => ({
+      ...s,
+      lastActive: today,
+      streak: s.lastActive === yest ? s.streak + 1 : 1,
+    }));
+  }, [lastActive, update]);
 
   const consistency = Math.min(
     100,
@@ -71,7 +61,7 @@ function DashboardPage() {
   );
 
   const dueRevisions = allLc.filter(
-    (p) => Date.now() - new Date(p.date).getTime() > 7 * 86400000
+    (p) => Date.now() - new Date(p.solvedAt).getTime() > 7 * 86400000
   ).length;
 
   const today = new Date().toLocaleDateString(undefined, {
@@ -82,7 +72,7 @@ function DashboardPage() {
   });
 
   const stageCounts = useMemo(() => {
-    return PIPELINE_STAGES.reduce<Record<Stage, number>>(
+    return stageOrder.reduce<Record<Stage, number>>(
       (acc, s) => {
         acc[s] = allCompanies.filter((c) => c.stage === s).length;
         return acc;
@@ -91,11 +81,19 @@ function DashboardPage() {
     );
   }, [allCompanies]);
 
-  const subjectList = (Object.keys(SUBJECT_TREE) as SubjectKey[]).map((k) => ({
-    key: k,
-    name: SUBJECT_TREE[k].name,
-    progress: subjects.progress(k, subjectState),
-  }));
+  const subjectList = allSubjects.map((subj) => {
+    const total = subj.topics.length;
+    const done = subj.topics.filter((t) => t.done).length;
+    return {
+      key: subj.id,
+      name: subj.name,
+      progress: {
+        done,
+        total,
+        pct: total > 0 ? Math.round((done / total) * 100) : 0,
+      },
+    };
+  });
 
   return (
     <div className="space-y-8">
@@ -104,7 +102,7 @@ function DashboardPage() {
         <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
           {greeting()},{" "}
           <span style={{ color: "var(--brand)" }}>
-            {allTasks.length > 0 ? "Dev" : "Dev"}
+            {profile.name || "Dev"}
           </span>
         </h2>
         <p className="mono mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
@@ -133,7 +131,7 @@ function DashboardPage() {
             Day Streak
           </div>
           <div className="mt-2 text-3xl font-semibold tabular-nums" style={{ color: "var(--brand)" }}>
-            {streakVal.count || 1}
+            {streakVal || 0}
           </div>
           <div className="mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
             days in a row
@@ -346,22 +344,19 @@ function DashboardPage() {
             </header>
             <div className="p-4">
               <div className="stage-grid grid grid-cols-2 gap-2">
-                {PIPELINE_STAGES.map((s) => (
-                  <div
-                    key={s}
-                    className="rounded-lg px-3 py-2.5"
-                    style={{ border: "1px solid var(--hairline)", background: "var(--surface-2)" }}
-                  >
-                    <div
-                      className={`mono text-[10px] uppercase tracking-widest ${stageColor[s]}`}
-                    >
-                      {stageLabel[s]}
+                {stageOrder.map((s) => {
+                  const count = allCompanies.filter((c) => c.stage === s).length;
+                  return (
+                    <div key={s} className="rounded-lg px-3 py-2.5" style={{ border: "1px solid var(--hairline)", background: "var(--surface-2)" }}>
+                      <div className={`mono text-[10px] uppercase tracking-widest ${stageColor[s]}`}>
+                        {stageLabels[s]}
+                      </div>
+                      <div className="mono mt-1 text-2xl font-bold">
+                        {count}
+                      </div>
                     </div>
-                    <div className="mono mt-1 text-2xl font-bold">
-                      {stageCounts[s]}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </section>

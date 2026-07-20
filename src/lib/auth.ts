@@ -5,7 +5,7 @@ import {
   createServerSupabaseClient,
   SUPABASE_ACCESS_COOKIE,
   SUPABASE_REFRESH_COOKIE,
-} from "@/lib/supabase";
+} from "@/lib/supabase-server";
 
 export type AppAuthUser = {
   id: string;

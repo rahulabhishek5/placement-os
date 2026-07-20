@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useStore } from "@/lib/placement-store";
-import { supabase } from "@/lib/supabase";
-import { auth } from "@/lib/store";
+
 import { useState } from "react";
 import { AlertTriangle, Download, Save, Trash2, User, Settings2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -41,13 +40,14 @@ function Banner({ type, msg }: { type: "success" | "error"; msg: string }) {
 
 // ─── Profile Section ──────────────────────────────────────────────────────────
 function ProfileSection() {
-  const { store, update, hydrated } = useStore();
-  const user = auth.useUser();
+  const { store: profile, update, hydrated } = useStore((s) => s.profile);
+  const { auth } = Route.useRouteContext();
+  const user = auth.user;
 
-  const [name, setName] = useState(store.profile.name ?? "");
-  const [college, setCollege] = useState(store.profile.college ?? "");
-  const [targetRole, setTargetRole] = useState(store.profile.targetRole ?? "Software Engineer");
-  const [lcUsername, setLcUsername] = useState(store.profile.lcUsername ?? "");
+  const [name, setName] = useState(profile.name ?? "");
+  const [college, setCollege] = useState(profile.college ?? "");
+  const [targetRole, setTargetRole] = useState(profile.targetRole ?? "Software Engineer");
+  const [lcUsername, setLcUsername] = useState(profile.lcUsername ?? "");
   const [saving, setSaving] = useState(false);
   const [lcLoading, setLcLoading] = useState(false);
   const [lcStatus, setLcStatus] = useState<"idle" | "valid" | "invalid">("idle");
@@ -55,7 +55,7 @@ function ProfileSection() {
   const [banner, setBanner] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   // Sync local input if store changes externally (e.g. after Supabase hydration)
-  const storeUsername = store.profile.lcUsername ?? "";
+  const storeUsername = profile.lcUsername ?? "";
 
   if (!hydrated) return null;
 
@@ -73,6 +73,7 @@ function ProfileSection() {
         profile: { ...s.profile, name, college, targetRole },
       }));
 
+      const { supabase } = await import("@/lib/supabase-client");
       const { data: { user: sbUser } } = await supabase.auth.getUser();
       if (sbUser) {
         const { error } = await supabase
@@ -109,10 +110,14 @@ function ProfileSection() {
       // Valid — persist
       update((s) => ({
         ...s,
-        profile: { ...s.profile, lcUsername: trimmed },
+        profile: {
+          ...s.profile,
+          lcUsername: trimmed,
+        },
         lcApiStats: result.stats,
       }));
 
+      const { supabase } = await import("@/lib/supabase-client");
       const { data: { user: sbUser } } = await supabase.auth.getUser();
       if (sbUser) {
         await supabase
@@ -154,6 +159,7 @@ function ProfileSection() {
       setLcPreview(null);
       setLcStatus("idle");
 
+      const { supabase } = await import("@/lib/supabase-client");
       const { data: { user: sbUser } } = await supabase.auth.getUser();
       if (sbUser) {
         await supabase
