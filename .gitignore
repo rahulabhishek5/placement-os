@@ -19,7 +19,6 @@ build/
 *.local
 import_files/
 Import_files/
-images/
 
 # Wrangler / Cloudflare
 .wrangler/
