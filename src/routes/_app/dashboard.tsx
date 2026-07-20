@@ -33,13 +33,13 @@ function greeting() {
 }
 
 function DashboardPage() {
-  const { store: allTasks } = useStore((s) => s.tasks);
-  const { store: allCompanies } = useStore((s) => s.applications);
-  const { store: streakVal, update } = useStore((s) => s.streak);
-  const { store: lastActive } = useStore((s) => s.lastActive);
-  const { store: profile } = useStore((s) => s.profile);
-  const { store: allLc } = useStore((s) => s.leetcode);
-  const { store: allSubjects } = useStore((s) => s.subjects);
+  const { data: allTasks } = useStore((s) => s.tasks);
+  const { data: allCompanies } = useStore((s) => s.applications);
+  const { data: streakVal, update } = useStore((s) => s.streak);
+  const { data: lastActive } = useStore((s) => s.lastActive);
+  const { data: profile } = useStore((s) => s.profile);
+  const { data: allLc } = useStore((s) => s.leetcode);
+  const { data: allSubjects } = useStore((s) => s.subjects);
   
   // Ping streak on mount
   useEffect(() => {

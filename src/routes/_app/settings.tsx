@@ -40,7 +40,7 @@ function Banner({ type, msg }: { type: "success" | "error"; msg: string }) {
 
 // ─── Profile Section ──────────────────────────────────────────────────────────
 function ProfileSection() {
-  const { store: profile, update, hydrated } = useStore((s) => s.profile);
+  const { data: profile, update, hydrated } = useStore((s) => s.profile);
   const { auth } = Route.useRouteContext();
   const user = auth.user;
 
@@ -281,7 +281,7 @@ function ProfileSection() {
           </div>
         )}
 
-        {store.profile.lcUsername && (
+        {profile.lcUsername && (
           <div className="mt-4">
             <button
               onClick={clearLcUsername}
@@ -300,12 +300,12 @@ function ProfileSection() {
 
 // ─── Data Section ─────────────────────────────────────────────────────────────
 function DataSection() {
-  const { store, update, hydrated } = useStore();
+  const { data: storeData, update, hydrated } = useStore();
 
   if (!hydrated) return null;
 
   const exportData = () => {
-    const blob = new Blob([JSON.stringify(store, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(storeData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

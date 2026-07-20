@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_app/subjects")({
 });
 
 function SubjectsPage() {
-  const { store: allSubjects, update } = useStore((s) => s.subjects);
+  const { data: allSubjects, update } = useStore((s) => s.subjects);
 
   const toggle = (subjId: string, topicId: string) => {
     update((s) => ({

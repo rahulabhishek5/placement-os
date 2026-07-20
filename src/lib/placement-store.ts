@@ -400,7 +400,7 @@ export function useStore<T = Store>(selector?: (state: Store) => T) {
     return selector ? selector(singletonStore) : (singletonStore as unknown as T);
   }, [selector]);
 
-  const store = useSyncExternalStore(
+  const syncedStore = useSyncExternalStore(
     (callback) => {
       listeners.add(callback);
       return () => listeners.delete(callback);
@@ -449,7 +449,7 @@ export function useStore<T = Store>(selector?: (state: Store) => T) {
     }
   }, []);
 
-  return { store, update, hydrated };
+  return { data: syncedStore, update, hydrated };
 }
 
 async function syncToSupabase(prev: Store, next: Store, userId: string | null) {

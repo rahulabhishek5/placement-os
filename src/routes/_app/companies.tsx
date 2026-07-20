@@ -16,7 +16,7 @@ const stageColor: Record<Stage, string> = {
 };
 
 function CompaniesPage() {
-  const { store: allApps, update, hydrated } = useStore((s) => s.applications);
+  const { data: allApps, update, hydrated } = useStore((s) => s.applications);
   const [open, setOpen] = useState(false);
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");

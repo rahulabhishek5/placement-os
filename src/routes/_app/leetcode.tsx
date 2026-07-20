@@ -12,9 +12,9 @@ export const Route = createFileRoute("/_app/leetcode")({
 });
 
 function LcPage() {
-  const { store: all, update, hydrated } = useStore((s) => s.leetcode);
-  const { store: profile } = useStore((s) => s.profile);
-  const { store: apiStats } = useStore((s) => s.lcApiStats);
+  const { data: all, update, hydrated } = useStore((s) => s.leetcode);
+  const { data: profile } = useStore((s) => s.profile);
+  const { data: apiStats } = useStore((s) => s.lcApiStats);
   const [title, setTitle] = useState("");
   const [diff, setDiff] = useState<LeetProblem["difficulty"]>("Easy");
   const [apiLoading, setApiLoading] = useState(false);

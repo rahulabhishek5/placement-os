@@ -8,8 +8,8 @@ function diffBg(d: string) {
 }
 
 export default function LeetCodeAnalytics() {
-  const { store: all } = useStore((s) => s.leetcode);
-  const { store: apiStats } = useStore((s) => s.lcApiStats);
+  const { data: all } = useStore((s) => s.leetcode);
+  const { data: apiStats } = useStore((s) => s.lcApiStats);
 
   const localStats = useMemo(() => {
     const b = { Easy: 0, Medium: 0, Hard: 0 };
