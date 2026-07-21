@@ -87,7 +87,7 @@ PlacementOS is live and continuously evolving! Your reviews and feedback are ess
 ### 🌟 How You Can Help Improve PlacementOS:
 - 🧪 **Test the Platform**: Try out the features, track your prep, and test the user flow.
 - 💡 **Suggest Website Improvements**: Have an idea for a new feature, widget, or workflow integration?
-- 🐛 **Report UI/UX Issues**: Found a bug, broken visual element, or responsiveness issue?
+- :art: **Report UI/UX Issues**: Found a bug, broken visual element, or responsiveness issue?
 - 💭 **Share Your Review**: Tell us what you loved and what can be made better!
 
 ---
