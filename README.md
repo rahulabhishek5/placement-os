@@ -14,13 +14,22 @@
   </div>
 </div>
 
+<!-- <div align="center">
+  <br />
+  <span>🚀 <b>Live Demo :</b> <a href="https://placement-os-one.vercel.app" target="_blank"> Placement OS </a></span>
+</div> -->
+
+
+> [!TIP]
+> 🚀 **Visit PlacementOS Live:** Access the V1 version at [Placement OS](https://placement-os-one.vercel.app)
+
 ---
 
 ## 📖 About PlacementOS
 
 **PlacementOS** is a streamlined, developer-first platform designed to take the chaos out of placement preparation. Instead of scattering your progress across spreadsheets, bookmarked links, and notepad files, PlacementOS brings your entire career prep pipeline under one clean, high-performance dashboard.
 
----
+
 
 ## ✨ Key Capabilities
 
