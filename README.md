@@ -14,9 +14,14 @@
   </div>
 </div>
 
+<!-- <div align="center">
+  <br />
+  <span>🚀 <b>Live Demo :</b> <a href="https://placement-os-one.vercel.app" target="_blank"> Placement OS </a></span>
+</div> -->
+
+
 > [!TIP]
 > 🚀 **Visit PlacementOS Live:** Access the V1 version at [Placement OS](https://placement-os-one.vercel.app)
-
 
 ---
 
@@ -24,7 +29,7 @@
 
 **PlacementOS** is a streamlined, developer-first platform designed to take the chaos out of placement preparation. Instead of scattering your progress across spreadsheets, bookmarked links, and notepad files, PlacementOS brings your entire career prep pipeline under one clean, high-performance dashboard.
 
----
+
 
 ## ✨ Key Capabilities
 
@@ -91,17 +96,8 @@ PlacementOS is live and continuously evolving! Your reviews and feedback are ess
 ### 🌟 How You Can Help Improve PlacementOS:
 - 🧪 **Test the Platform**: Try out the features, track your prep, and test the user flow.
 - 💡 **Suggest Website Improvements**: Have an idea for a new feature, widget, or workflow integration?
-- 🐛 **Report UI/UX Issues**: Found a bug, broken visual element, or responsiveness issue?
+- :art: **Report UI/UX Issues**: Found a bug, broken visual element, or responsiveness issue?
 - 💭 **Share Your Review**: Tell us what you loved and what can be made better!
-
-<br />
-
-<div align="center">
-  <a href="https://www.linkedin.com/posts/kaitala-rahul-abhishek_placements-leetcode-reactjs-activity-7485321438338605056-a6SK" target="_blank">
-    <img src="https://img.shields.io/badge/LinkedIn-Share%20Feedback%20%26%20Reviews-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn Post Feedback" />
-  </a>
-  <p><br />👉 <strong><a href="https://www.linkedin.com/posts/kaitala-rahul-abhishek_placements-leetcode-reactjs-activity-7485321438338605056-a6SK" target="_blank">Click here to join the discussion & drop your comments on LinkedIn!</a></strong></p>
-</div>
 
 ---
 
