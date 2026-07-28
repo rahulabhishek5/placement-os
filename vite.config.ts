@@ -20,17 +20,17 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   build: {
-    rolldownOptions: {
+    rollupOptions: {
       output: {
-        codeSplitting: {
-          groups: [
-            { name: "vendor-react", test: vendorReact },
-            { name: "vendor-radix", test: vendorRadix },
-            { name: "vendor-query", test: vendorQuery },
-            { name: "vendor-recharts", test: vendorRecharts },
-            { name: "vendor-supabase", test: vendorSupabase },
-            { name: "vendor", test: vendorAll },
-          ],
+        // Explicit vendor splits keep per-route JS chunks small so navigation
+        // lazy-loads only the code for the clicked route, not the entire app.
+        manualChunks(id) {
+          if (vendorReact.test(id)) return "vendor-react";
+          if (vendorRadix.test(id)) return "vendor-radix";
+          if (vendorQuery.test(id)) return "vendor-query";
+          if (vendorRecharts.test(id)) return "vendor-recharts";
+          if (vendorSupabase.test(id)) return "vendor-supabase";
+          if (vendorAll.test(id)) return "vendor";
         },
       },
     },

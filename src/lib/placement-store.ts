@@ -463,19 +463,23 @@ async function syncToSupabase(prev: Store, next: Store, userId: string | null) {
     const removedTasks = prev.tasks.filter((t) => !addedIds.has(t.id));
 
     if (removedTasks.length > 0) {
-      supabase
+      // Supabase QueryBuilder is thenable but does not implement .catch() —
+      // use .then(({ error }) => ...) for fire-and-forget error logging.
+      void supabase
         .from("tasks")
         .delete()
         .in(
           "id",
           removedTasks.map((t) => t.id)
         )
-        .catch((err) => console.error("[Sync] Failed to delete tasks:", err));
+        .then(({ error }) => {
+          if (error) console.error("[Sync] Failed to delete tasks:", error);
+        });
     }
 
     const newTasks = next.tasks.filter((t) => !prev.tasks.some((p) => p.id === t.id));
     if (newTasks.length > 0) {
-      supabase
+      void supabase
         .from("tasks")
         .insert(
           newTasks.map((t) => ({
@@ -486,7 +490,9 @@ async function syncToSupabase(prev: Store, next: Store, userId: string | null) {
             done: t.done,
           }))
         )
-        .catch((err) => console.error("[Sync] Failed to insert tasks:", err));
+        .then(({ error }) => {
+          if (error) console.error("[Sync] Failed to insert tasks:", error);
+        });
     }
 
     const toggled = next.tasks.filter((t) => {
@@ -494,7 +500,7 @@ async function syncToSupabase(prev: Store, next: Store, userId: string | null) {
       return p && p.done !== t.done;
     });
     if (toggled.length > 0) {
-      supabase
+      void supabase
         .from("tasks")
         .upsert(
           toggled.map((t) => ({
@@ -505,7 +511,9 @@ async function syncToSupabase(prev: Store, next: Store, userId: string | null) {
             done: t.done,
           }))
         )
-        .catch((err) => console.error("[Sync] Failed to upsert tasks:", err));
+        .then(({ error }) => {
+          if (error) console.error("[Sync] Failed to upsert tasks:", error);
+        });
     }
   }
 
@@ -516,14 +524,16 @@ async function syncToSupabase(prev: Store, next: Store, userId: string | null) {
 
     const removed = prev.applications.filter((a) => !nextIds.has(a.id));
     if (removed.length > 0) {
-      supabase
+      void supabase
         .from("applications")
         .delete()
         .in(
           "id",
           removed.map((a) => a.id)
         )
-        .catch((err) => console.error("[Sync] Failed to delete applications:", err));
+        .then(({ error }) => {
+          if (error) console.error("[Sync] Failed to delete applications:", error);
+        });
     }
 
     const upserted = next.applications.filter(
@@ -553,7 +563,7 @@ async function syncToSupabase(prev: Store, next: Store, userId: string | null) {
 
   // Profile / streak
   if (next.profile !== prev.profile || next.streak !== prev.streak) {
-    supabase
+    void supabase
       .from("profiles")
       .update({
         name: next.profile.name,
@@ -563,7 +573,9 @@ async function syncToSupabase(prev: Store, next: Store, userId: string | null) {
         streak: next.streak,
       })
       .eq("id", userId)
-      .catch((err) => console.error("[Sync] Failed to update profile:", err));
+      .then(({ error }) => {
+        if (error) console.error("[Sync] Failed to update profile:", error);
+      });
   }
 }
 

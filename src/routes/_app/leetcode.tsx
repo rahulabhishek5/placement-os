@@ -88,8 +88,10 @@ function LcPage() {
     <div className="space-y-6">
       <PageHeader title="LeetCode Tracker" subtitle="Log every solve. Watch momentum compound." />
 
-      {/* Username connection banner */}
-      {hydrated && (
+      {/* Username connection banner — skeleton while store hydrates */}
+      {!hydrated ? (
+        <div className="h-[46px] rounded-lg border border-hairline bg-surface/60 animate-pulse" />
+      ) : (
         lcUsername ? (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
             <span className="mono text-[10px] uppercase tracking-widest text-muted-foreground">Connected as</span>

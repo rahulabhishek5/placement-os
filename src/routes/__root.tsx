@@ -71,8 +71,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  beforeLoad: async () => {
-    const auth = await getAuthState();
+  beforeLoad: async ({ context }) => {
+    // Cache auth state in React Query so internal SPA navigations (sidebar clicks)
+    // hit the in-memory cache instead of firing a _serverFn network request on
+    // every route change. Only the first visit (or after 5-min stale) calls Supabase.
+    const auth = await context.queryClient.ensureQueryData({
+      queryKey: ["auth"],
+      queryFn: () => getAuthState(),
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
 
     return { auth };
   },

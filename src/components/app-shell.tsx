@@ -135,7 +135,7 @@ function SidebarInner({
   return (
     <>
       <div className="flex items-center justify-between h-16 px-4 border-b border-hairline">
-        <Link to="/dashboard" onClick={onNavigate} className="flex items-center gap-2 min-w-0">
+        <Link to="/dashboard" onClick={onNavigate} preload="intent" className="flex items-center gap-2 min-w-0">
           <span className="text-brand text-lg">✓</span>
           {!collapsed && <span className="mono text-sm truncate">PlacementOS</span>}
         </Link>
@@ -155,6 +155,7 @@ function SidebarInner({
               key={item.to}
               to={item.to}
               onClick={onNavigate}
+              preload="intent"
               className={cn(
                 "group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                 isActive
