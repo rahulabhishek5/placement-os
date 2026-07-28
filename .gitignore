@@ -43,6 +43,10 @@ venv/
 # Environment Variables
 .env
 .env.*
+!.env.example
+
+# Supabase CLI
+supabase/.temp/
 
 # Local Netlify folder
 .netlify
