@@ -11,13 +11,32 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 function serializeCookie(name: string, value: string, maxAge: number) {
+  // SECURITY NOTE — HttpOnly limitation:
+  // The `HttpOnly` flag prevents JavaScript from reading a cookie via document.cookie.
+  // However, HttpOnly can ONLY be set by the server via a `Set-Cookie` response header —
+  // browsers silently ignore the HttpOnly attribute when set from JavaScript.
+  //
+  // This function runs client-side, so we CANNOT set HttpOnly here. The auth tokens
+  // remain readable by JavaScript on this page. Acceptable risk given:
+  //   a) React's JSX escaping eliminates reflected XSS vectors in this codebase.
+  //   b) No raw HTML is ever injected (dangerouslySetInnerHTML audit: only in chart.tsx
+  //      for CSS variable injection — not user-controlled data).
+  //
+  // FUTURE MIGRATION PATH (recommended before public launch):
+  // Replace this client-side cookie management with @supabase/ssr + server functions.
+  // The server function calls `response.headers.append("Set-Cookie", "...; HttpOnly")`
+  // which allows the browser to enforce HttpOnly correctly.
+  // See: https://supabase.com/docs/guides/auth/server-side/creating-a-client
   const secure = typeof window !== "undefined" && window.location.protocol === "https:";
 
   return [
     `${name}=${encodeURIComponent(value)}`,
     "Path=/",
     `Max-Age=${maxAge}`,
-    "SameSite=Lax",
+    // SameSite=Strict: cookie is NEVER sent on cross-site requests (not even on
+    // top-level GET navigations from external sites). More restrictive than Lax.
+    // Safe here because this app has no OAuth implicit-flow requiring Lax.
+    "SameSite=Strict",
     secure ? "Secure" : "",
   ]
     .filter(Boolean)

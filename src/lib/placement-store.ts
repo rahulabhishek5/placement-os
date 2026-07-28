@@ -178,6 +178,18 @@ export function resetStore() {
   emit(defaultStore);
 }
 
+/**
+ * Removes every localStorage key written by this module.
+ * Must be called on logout so no user data survives on shared devices.
+ * Keep this list in sync with any future keys added to this module.
+ */
+export function clearPersistedStorage() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(KEY);             // "placementos::v1" — current store
+  localStorage.removeItem("pos:lc");        // legacy LeetCode key
+  localStorage.removeItem("pos:subjects");  // legacy subjects key
+}
+
 function emit(next: Store) {
   singletonStore = next;
   listeners.forEach((l) => l());

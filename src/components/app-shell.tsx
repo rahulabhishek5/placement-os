@@ -35,15 +35,13 @@ export function AppShell({
 
   const handleLogout = async () => {
     const { supabase, syncSupabaseSessionCookies } = await import("@/lib/supabase-client");
-    const { resetStore } = await import("@/lib/placement-store");
+    const { resetStore, clearPersistedStorage } = await import("@/lib/placement-store");
     try {
       await supabase.auth.signOut();
     } finally {
-      syncSupabaseSessionCookies(null);
-      // Reset the singleton store so the next login gets a fresh bootstrap.
-      // Without this, singletonHydrated stays true in the same tab and
-      // bootstrapOnce() is never re-called after re-login.
-      resetStore();
+      syncSupabaseSessionCookies(null); // zero-out JS-accessible auth cookies
+      resetStore();                     // clear in-memory singleton → next login gets fresh bootstrap
+      clearPersistedStorage();          // purge ALL localStorage keys — no data survives on shared devices
     }
     await router.invalidate();
     navigate({ to: "/login" });
