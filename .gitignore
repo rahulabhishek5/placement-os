@@ -55,3 +55,20 @@ supabase/.temp/
 .agents/
 stats.html
 dependency_graph.md
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# TypeScript Build Info
+*.tsbuildinfo
+
+# Local Databases (if any testing DBs are created)
+*.db
+*.sqlite
+*.sqlite3
