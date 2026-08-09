@@ -18,7 +18,7 @@ build/
 .nitro
 *.local
 import_files/
-Import_files/
+.fallow/
 
 # Wrangler / Cloudflare
 .wrangler/
@@ -72,3 +72,6 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+
+# Interview Handbook
+INTERVIEW_HANDBOOK.md
